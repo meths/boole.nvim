@@ -28,7 +28,7 @@ $ git clone --depth 1 https://github.com/nat-418/boole.nvim ~/.local/share/nvim/
 Configuration
 -------------
 
-Boole can be mapped to a key by passing a configuration table to the 
+Boole can be mapped to a key by passing a configuration table to the
 `setup` function. You can also add any cycle of words you would like.
 Feel free to submit an issue and pull request with additions you
 think would make good defaults.
@@ -52,3 +52,9 @@ require('boole').setup({
   }
 })
 ```
+
+Testing
+-------
+
+Tests, using the Plenary framework, may be added to the `tests/` directory and
+run with `make test`.
