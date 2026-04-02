@@ -1,5 +1,5 @@
 local M = {}
-local ori_v_count = 0
+
 local replace_map = {
     increment = {},
     decrement = {},
@@ -293,157 +293,38 @@ local generate_defaults = function(defaults)
     end
 end
 
---Check cursor word match the cword
-function check_postion_word(words, target_position, target_word)
-    --In lua tab space is %s other is %S
-    --In vim cword won't contains ", different behavior with lua
-    --we have to know char in column[0] is word or %s
-    i, j = string.find(words, '%S+')
-    local position = 0
-    if i == 1 then
-        position = j
-        --Cursor in first word
-        if position > target_position then
-            return string.find(words:sub(i, j), target_word)
+-- Fallback to next <C-a> and <C-x> functions.  Depending on configuration,
+-- this could be other plugins or the built-in functions for numbers.
+local call_vim_fallback_functions = function(direction, v_count)
+    if v_count ~= nil and v_count > 0 then
+        if direction == 'increment' then
+            return vim.cmd('normal!' .. v_count .. '')
+        end
+        if direction == 'decrement' then
+            return vim.cmd('normal!' .. v_count .. '')
+        end
+    else
+        if direction == 'increment' then
+            return vim.cmd('normal!' .. '')
+        end
+        if direction == 'decrement' then
+            return vim.cmd('normal!' .. '')
         end
     end
-    -- split word with (space\tab)word
-    for word in string.gmatch(words, '%s+%S+') do
-        position = position + string.len(word)
-        local s_word = word:gsub('%s', '')
-        -- means target_position is in %s location no need to compare
-        if position - string.len(s_word) >= target_position then
-            return false
-        end
-        if position > target_position then
-            return string.find(s_word, target_word)
-        end
-    end
-    return false
-end
-
-function number_exist_in_word(line, current_column)
-    local space_after_cursor = string.find(line:sub(current_column + 1, string.len(line)), ' ')
-    if space_after_cursor and space_after_cursor > 1 then
-        local word_after_cursor = line:sub(current_column + 1, current_column + space_after_cursor)
-        if string.match(word_after_cursor, '%d') then
-            return true
-        end
-    -- no space check it contains number or not
-    elseif space_after_cursor == nil then
-        local last_string = line:sub(current_column + 1, string.len(line))
-        if string.match(last_string, '%d') then
-            return true
-        end
-    end
-    return false
 end
 
 M.run = function(direction)
-    local start_position = vim.api.nvim_win_get_cursor(0)
+    -- The current word under the cursor is all we are interested in
+    local word = vim.fn.expand('<cword>')
+    local v_count = vim.v.count
 
-    -- Tail-recursive function to match and replace.
-    local function tryMatch(last_position)
-        local line = vim.api.nvim_get_current_line()
-        local cword = vim.fn.expand('<cword>')
-        local current_position = vim.api.nvim_win_get_cursor(0)
-        local current_column = current_position[2]
-        --Record the v.count vim.v.count will be reset after vim.cmd
-        --if we have any good idea please modify it
-        if vim.v.count ~= 0 then
-            ori_v_count = vim.v.count
-        end
-
-        -- C-a and C-x already handle numbers, no need to try and
-        -- match them to out added values.
-        -- after current_column contains number
-        if tonumber(cword) ~= nil or number_exist_in_word(line, current_column) then
-            return false
-        end
-
-        -- we only need check char in alpha and number
-        if string.find(line:sub(current_column + 1, current_column + 1), '[^][a-zA-Z0-9]') then
-            if (current_column + 1) == vim.fn.strlen(line) then
-                vim.api.nvim_win_set_cursor(0, start_position)
-                return false
-            end
-            vim.cmd('normal! w')
-            return tryMatch(current_position)
-        end
-
-        -- Limit matches to the original line.
-        if last_position[1] < current_position[1] then
-            -- After check number exist in word avoid number in front of cursor be increase or decrease
-            -- if we use wb 123_te*st (* as cursor) and use <C-a>
-            -- will be 124*_test not as aspect
-            vim.api.nvim_win_set_cursor(0, start_position)
-            return false
-        end
-
-        -- Do we have a match?
-        local match = direction == 'decrement' and replace_map.decrement[cword] or replace_map.increment[cword]
-
-        if match then
-            -- Are we on the first character of the word? If not, move there.
-            -- If not first char compare current word is match or not
-            if cword:sub(1, 1) ~= line:sub(current_column + 1, current_column + 1) then
-                if check_postion_word(line, current_column, cword) then
-                    vim.cmd('normal! b')
-                else
-                    vim.cmd('normal! w')
-                end
-                return tryMatch(current_position)
-            -- Are we at the end of the line? If so, jump back.
-            -- Even in last word we will check match or not so move this to back
-            elseif (current_column + 1) == vim.fn.strlen(line) then
-                vim.api.nvim_win_set_cursor(0, start_position)
-                return false
-            end
-            --use ori_v_count to get correct match data
-            for i = 0, ori_v_count - 1 do
-                match = direction == 'decrement' and replace_map.decrement[cword] or replace_map.increment[cword]
-                if match then
-                    cword = match
-                else
-                    return false
-                end
-            end
-            -- Replace the word and put the cursor on the beginning of replacement.
-            ori_v_count = 0
-            vim.cmd('normal! "_ciw' .. match)
-            vim.cmd('normal! b')
-            return true
-        else
-            -- Are we at the end of the line? If so, give up.
-            if (current_column + 1) == vim.fn.strlen(line) then
-                vim.api.nvim_win_set_cursor(0, start_position)
-                return false
-            end
-            -- Try the next word to see if it matches.
-            vim.cmd('normal! w')
-            return tryMatch(current_position)
-        end
+    -- If we have the cursor in an empty location there is nothing to do.
+    if word == '' then
+        return false
     end
-
-    -- Fallback to original <C-a> and <C-x> functions for numbers.
-    if not tryMatch(start_position) then
-        local target_v_count = ori_v_count
-        ori_v_count = 0
-        if target_v_count ~= nil and target_v_count > 0 then
-            if direction == 'increment' then
-                return vim.cmd('normal!' .. target_v_count .. '')
-            end
-            if direction == 'decrement' then
-                return vim.cmd('normal!' .. target_v_count .. '')
-            end
-        else
-            if direction == 'increment' then
-                return vim.cmd('normal!' .. '')
-            end
-            if direction == 'decrement' then
-                return vim.cmd('normal!' .. '')
-            end
-        end
+    -- If the word is purely numeric then leave to the builtin functions.
+    if tonumber(word) ~= nil then
+        return call_vim_fallback_functions(direction, v_count)
     end
 end
 
