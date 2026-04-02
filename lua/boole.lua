@@ -13,12 +13,11 @@ local default_opts = {
     additions = nil,
     allow_caps_additions = nil,
     defaults = {
-        letters = true,
         booleans = true,
         canonical_hours = true,
         days_of_week = true,
         months_of_year = true,
-        colors = true,
+        colors = false,
     },
 }
 
@@ -44,55 +43,9 @@ M.generate = function(loop_list, allow_caps)
     end
 end
 
-local letters = {
-    'a',
-    'b',
-    'c',
-    'd',
-    'e',
-    'f',
-    'g',
-    'h',
-    'i',
-    'j',
-    'k',
-    'l',
-    'm',
-    'n',
-    'o',
-    'p',
-    'q',
-    'r',
-    's',
-    't',
-    'u',
-    'v',
-    'w',
-    'x',
-    'y',
-    'z',
-}
-
 local generate_defaults = function(defaults)
     if defaults == nil or defaults == false then
         return
-    end
-
-    if defaults.letters then
-        for _, letter in ipairs(letters) do
-            M.generate({
-                letter .. 0,
-                letter .. 1,
-                letter .. 2,
-                letter .. 3,
-                letter .. 4,
-                letter .. 5,
-                letter .. 6,
-                letter .. 7,
-                letter .. 8,
-                letter .. 9,
-            }, true)
-        end
     end
 
     if defaults.booleans then
