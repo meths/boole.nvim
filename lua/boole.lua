@@ -298,21 +298,21 @@ end
 -- Fallback to next <C-a> and <C-x> functions.  Depending on configuration,
 -- this could be other plugins or the built-in functions for numbers.
 local call_vim_fallback_functions = function(direction, v_count)
+    local fallback_key
     if v_count ~= nil and v_count > 0 then
         if direction == 'increment' then
-            return vim.cmd('normal!' .. v_count .. '')
-        end
-        if direction == 'decrement' then
-            return vim.cmd('normal!' .. v_count .. '')
+            fallback_key = vim.api.nvim_replace_termcodes(v_count .. '<C-a>', true, false, true)
+        elseif direction == 'decrement' then
+            fallback_key = vim.api.nvim_replace_termcodes(v_count .. '<C-x>', true, false, true)
         end
     else
         if direction == 'increment' then
-            return vim.cmd('normal!' .. '')
-        end
-        if direction == 'decrement' then
-            return vim.cmd('normal!' .. '')
+            fallback_key = vim.api.nvim_replace_termcodes('<C-a>', true, false, true)
+        elseif direction == 'decrement' then
+            fallback_key = vim.api.nvim_replace_termcodes('<C-x>', true, false, true)
         end
     end
+    return vim.api.nvim_feedkeys(fallback_key, 'n', false)
 end
 
 local process_word = function(word, match)
