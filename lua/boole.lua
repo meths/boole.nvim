@@ -368,7 +368,10 @@ M.run = function(direction)
         return call_vim_fallback_functions(direction, v_count)
     end
 
-    local match = direction == 'decrement' and replace_map.decrement[word] or replace_map.increment[word]
+    local match = word
+    for _ = v_count, 1, -1 do
+        match = direction == 'decrement' and replace_map.decrement[match] or replace_map.increment[match]
+    end
 
     if not match then
         -- We have no match for this word.  If the word ends with digits give
