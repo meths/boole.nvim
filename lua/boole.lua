@@ -74,22 +74,22 @@ local generate_defaults = function(defaults)
 
     if defaults.days_of_week then
         M.generate({
+            'sunday',
             'monday',
             'tuesday',
             'wednesday',
             'thursday',
             'friday',
             'saturday',
-            'sunday',
         }, true)
         M.generate({
+            'sun',
             'mon',
             'tue',
             'wed',
             'thu',
             'fri',
             'sat',
-            'sun',
         }, true)
     end
 
