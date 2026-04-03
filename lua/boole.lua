@@ -1,5 +1,7 @@
 local M = {}
 
+local unpack = unpack or table.unpack
+
 local replace_map = {
     increment = {},
     decrement = {},
@@ -313,6 +315,45 @@ local call_vim_fallback_functions = function(direction, v_count)
     end
 end
 
+local process_word = function(word, match)
+    -- nvim_buf_set_text({buffer}, {start_row}, {start_col}, {end_row}, {end_col}, {replacement})
+    --   0-based indexing.
+    --   end_col needs to be calculated taking the larger of the two words
+    --   being swapped (word or match).
+    --   The buffer parameter is 0 for the current buffer.
+    -- [row, column] = vim.api.nvim_win_get_cursor({window})
+    --   Gets the (1,0)-indexed cursor position (row, column)
+    --   The window parameter is 0 for the current buffer.
+    -- start, end = string.find(string, pattern, index)
+    --   start, end and index are 1-based.
+    --
+    -- The vim cword grabbing is from the space before the word up until the
+    -- word end.  This means the interaction of the various index bases and
+    -- the cword can leave us off by two positions between the cursor and the
+    -- word start found by string.find().  Hence the '+ 2' below.
+
+    local row, cursor_column = unpack(vim.api.nvim_win_get_cursor(0))
+    local line = vim.api.nvim_get_current_line()
+
+    -- There may be multiple occurrences of the word in the line so make sure
+    -- we find the occurrence where the cursor is.
+    local position = 1
+    local word_start, word_end
+    repeat
+        word_start, word_end = string.find(line, word, position)
+        if word_start == nil or word_end == nil then
+            return false
+        end
+        position = word_end
+    until word_start <= cursor_column + 2 and word_end > cursor_column
+
+    local change_row = row - 1
+    local change_start = word_start - 1
+    local change_length = string.len(word)
+
+    vim.api.nvim_buf_set_text(0, change_row, change_start, change_row, change_start + change_length, { match })
+end
+
 M.run = function(direction)
     -- The current word under the cursor is all we are interested in
     local word = vim.fn.expand('<cword>')
@@ -322,10 +363,24 @@ M.run = function(direction)
     if word == '' then
         return false
     end
-    -- If the word is purely numeric then leave to the builtin functions.
+    -- If the word is purely numeric then leave to the built-in functions.
     if tonumber(word) ~= nil then
         return call_vim_fallback_functions(direction, v_count)
     end
+
+    local match = direction == 'decrement' and replace_map.decrement[word] or replace_map.increment[word]
+
+    if not match then
+        -- We have no match for this word.  If the word ends with digits give
+        -- the built-in functions a chance.
+        if string.match(word, '[%a%d]*%d+') == word then
+            return call_vim_fallback_functions(direction, v_count)
+        else
+            return false
+        end
+    end
+
+    process_word(word, match)
 end
 
 M.setup = function(options)
